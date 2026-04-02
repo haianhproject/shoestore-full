@@ -1,8 +1,13 @@
 <template>
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow">
     <div class="container">
-      <router-link class="navbar-brand fw-bold fs-3" to="/" @click="handleLogoClick">
-        <span class="text-warning">SHOE</span>STORE
+      <router-link to="/" class="navbar-brand d-flex align-items-center" @click="handleLogoClick">
+        <div class="logo-wrapper me-2">
+          <i class="bi bi-lightning-charge-fill text-warning fs-2"></i>
+        </div>
+        <span class="brand-text">
+          V-<span class="text-warning">STRIDE</span>
+        </span>
       </router-link>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -154,4 +159,63 @@ onUnmounted(() => {
 .nav-link:hover {
   color: #ffc107 !important;
 }
+.navbar {
+  border-bottom: 1px solid #333;
+}
+/* 1. Thiết kế chung cho cả Logo (i) và Chữ (span) */
+.logo-wrapper i,
+.brand-text {
+  background: linear-gradient(to right, #fff 20%, #ffc107 40%, #ffc107 60%, #fff 80%);
+  background-size: 200% auto;
+
+  /* Cắt màu theo hình dạng của icon/chữ */
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  /* Hiệu ứng chạy màu liên tục */
+  animation: shine 3s linear infinite;
+
+  /* Quan trọng: Để icon nhận được hiệu ứng background-clip */
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+/* 2. Điều chỉnh kích thước riêng cho từng cái */
+.brand-text {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  text-transform: uppercase;
+}
+
+.logo-wrapper i {
+  font-size: 2.2rem; /* Chỉnh icon to hơn chữ một chút cho cân đối */
+  margin-right: 8px;
+}
+
+/* 3. Hiệu ứng khi HOVER cho cả cụm */
+.navbar-brand:hover .brand-text,
+.navbar-brand:hover .logo-wrapper i {
+  /* Cả hai cùng bừng sáng rực rỡ hơn */
+  filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.8));
+  transform: scale(1.05); /* Phóng lớn nhẹ cả icon và chữ */
+}
+
+
+
+/* 4. Animation dùng chung */
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* 5. Căn chỉnh khung chứa logo */
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 </style>
