@@ -18,6 +18,7 @@ const routes = [
   { path: '/forgot-password', component: () => import('../views/ForgotPasswordView.vue') },
 ]
 
+
 const router = createRouter({
   history: createWebHistory(),
   routes,
