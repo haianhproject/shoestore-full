@@ -67,25 +67,7 @@
         </div>
       </div>
 
-      <div v-if="showSuccessModal" class="custom-modal-overlay d-flex align-items-center justify-content-center">
-        <div class="custom-modal-content text-center p-5 rounded-5 shadow-lg animate-zoom">
-          <i class="bi bi-check-circle-fill text-success display-1 mb-3 drop-shadow-success"></i>
-          <h4 class="fw-bold mt-2 text-uppercase">Đã thêm vào giỏ!</h4>
-          <p class="text-muted mb-4">
-            Sản phẩm <b>{{ item.name }}</b> (Size: {{ selectedSize }}) đã sẵn sàng để thanh toán.
-          </p>
-          <div class="d-grid gap-2">
-            <router-link to="/cart" class="btn btn-dark rounded-pill fw-bold py-2" @click="closeSuccessAndScroll">
-              THANH TOÁN NGAY
-            </router-link>
-            <button class="btn btn-light rounded-pill fw-bold py-2 border" @click="showSuccessModal = false">
-              Tiếp tục mua sắm
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </Teleport>
+      </Teleport>
   </div>
 </template>
 
@@ -105,7 +87,6 @@ const emit = defineEmits(['add-to-cart', 'view-detail']);
 const router = useRouter();
 
 const showSizeModal = ref(false);
-const showSuccessModal = ref(false);
 const selectedSize = ref(40);
 const sizes = [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
 
@@ -132,15 +113,12 @@ const handleAddToCartClick = () => {
 };
 
 const confirmAddToCart = () => {
+  // 1. Ẩn modal hỏi Size ngay lập tức
   showSizeModal.value = false;
+
+  // 2. Gom dữ liệu và bắn lên cho cha xử lý (Cha sẽ tự lo việc hiện thông báo Thành công)
   const itemWithSize = { ...props.item, size: selectedSize.value };
   emit('add-to-cart', itemWithSize);
-  showSuccessModal.value = true;
-};
-
-const closeSuccessAndScroll = () => {
-  showSuccessModal.value = false;
-  scrollToTop();
 };
 </script>
 
@@ -164,7 +142,7 @@ const closeSuccessAndScroll = () => {
 .action-btn:hover { background-color: #ffc107; border-color: #ffc107; color: #000; }
 .action-btn:active { transform: scale(0.95); }
 
-/* Đưa CSS Modal ra dùng chung toàn cục hoặc giữ ở đây Teleport vẫn ăn CSS nhé */
+/* Modal Styles */
 .custom-modal-overlay {
   position: fixed;
   top: 0;
@@ -173,14 +151,14 @@ const closeSuccessAndScroll = () => {
   height: 100vh;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(5px);
-  z-index: 99999; /* Tăng z-index để đè lên cả navbar */
-  display: flex; /* Quan trọng để căn giữa */
+  z-index: 99999;
+  display: flex;
 }
 .custom-modal-content {
   background: white;
   width: 90%;
   max-width: 400px;
-  margin: auto; /* Căn giữa hoàn hảo */
+  margin: auto;
 }
 .size-grid {
   display: grid;
@@ -188,7 +166,6 @@ const closeSuccessAndScroll = () => {
   gap: 10px;
 }
 .size-btn { height: 40px; border-radius: 10px; }
-.drop-shadow-success { filter: drop-shadow(0 10px 15px rgba(25, 135, 84, 0.4)); }
 .animate-zoom { animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
 @keyframes zoomIn {
   from { opacity: 0; transform: scale(0.8); }
