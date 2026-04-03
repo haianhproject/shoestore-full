@@ -12,10 +12,7 @@
     <div class="card-body text-center d-flex flex-column">
       <small class="text-muted text-uppercase fw-bold">{{ item.category }}</small>
 
-      <h5
-        class="card-title fw-bold mt-1 cursor-pointer product-name"
-        @click="goToDetails"
-      >
+      <h5 class="card-title fw-bold mt-1 cursor-pointer product-name" @click="goToDetails">
         {{ item.name }}
       </h5>
 
@@ -29,16 +26,74 @@
       <div class="mt-auto">
         <button
           class="btn btn-dark w-100 rounded-pill fw-bold py-2 action-btn"
-          @click="$emit('add-to-cart', item)"
+          @click="handleAddToCartClick"
         >
           🛒 THÊM GIỎ HÀNG
         </button>
       </div>
     </div>
+
+    <Teleport to="body">
+
+      <div v-if="showSizeModal" class="custom-modal-overlay d-flex align-items-center justify-content-center">
+        <div class="custom-modal-content p-4 rounded-5 shadow-lg animate-zoom">
+          <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+            <h5 class="fw-bold mb-0">📏 Chọn Kích Cỡ</h5>
+            <button class="btn-close" @click="showSizeModal = false"></button>
+          </div>
+
+          <div class="d-flex align-items-center gap-3 mb-4 bg-light p-2 rounded-4 border">
+            <img :src="item.image" width="60" class="rounded-3 object-fit-contain bg-white border">
+            <div class="text-start">
+              <h6 class="mb-1 fw-bold">{{ item.name }}</h6>
+              <span class="text-danger fw-bold">${{ item.price }}</span>
+            </div>
+          </div>
+
+          <div class="size-grid mb-4">
+            <button
+              v-for="size in sizes"
+              :key="size"
+              class="btn size-btn fw-bold transition-all"
+              :class="selectedSize === size ? 'btn-dark shadow' : 'btn-outline-secondary'"
+              @click="selectedSize = size"
+            >
+              {{ size }}
+            </button>
+          </div>
+          <button class="btn btn-warning w-100 rounded-pill fw-bold py-3 text-uppercase" @click="confirmAddToCart">
+            Xác nhận thêm
+          </button>
+        </div>
+      </div>
+
+      <div v-if="showSuccessModal" class="custom-modal-overlay d-flex align-items-center justify-content-center">
+        <div class="custom-modal-content text-center p-5 rounded-5 shadow-lg animate-zoom">
+          <i class="bi bi-check-circle-fill text-success display-1 mb-3 drop-shadow-success"></i>
+          <h4 class="fw-bold mt-2 text-uppercase">Đã thêm vào giỏ!</h4>
+          <p class="text-muted mb-4">
+            Sản phẩm <b>{{ item.name }}</b> (Size: {{ selectedSize }}) đã sẵn sàng để thanh toán.
+          </p>
+          <div class="d-grid gap-2">
+            <router-link to="/cart" class="btn btn-dark rounded-pill fw-bold py-2" @click="closeSuccessAndScroll">
+              THANH TOÁN NGAY
+            </router-link>
+            <button class="btn btn-light rounded-pill fw-bold py-2 border" @click="showSuccessModal = false">
+              Tiếp tục mua sắm
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </Teleport>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { auth } from '../firebase';
+
 const props = defineProps({
   item: {
     type: Object,
@@ -47,15 +102,45 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['add-to-cart', 'view-detail']);
+const router = useRouter();
+
+const showSizeModal = ref(false);
+const showSuccessModal = ref(false);
+const selectedSize = ref(40);
+const sizes = [34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46];
 
 const handleImageError = (e) => {
   e.target.onerror = null;
   e.target.src = "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600";
 };
 
-// Hàm dùng chung cho click vào ảnh và tên
 const goToDetails = () => {
   emit('view-detail', props.item);
+};
+
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+const handleAddToCartClick = () => {
+  if (!auth.currentUser) {
+    router.push('/login');
+    scrollToTop();
+    return;
+  }
+  showSizeModal.value = true;
+};
+
+const confirmAddToCart = () => {
+  showSizeModal.value = false;
+  const itemWithSize = { ...props.item, size: selectedSize.value };
+  emit('add-to-cart', itemWithSize);
+  showSuccessModal.value = true;
+};
+
+const closeSuccessAndScroll = () => {
+  showSuccessModal.value = false;
+  scrollToTop();
 };
 </script>
 
@@ -65,55 +150,48 @@ const goToDetails = () => {
   border-radius: 20px;
   background-color: #fff;
 }
-
 .shoe-card:hover {
   transform: translateY(-10px);
   box-shadow: 0 15px 35px rgba(0,0,0,0.12) !important;
 }
+.product-name { transition: color 0.2s; }
+.product-name:hover { color: #ffc107; text-decoration: underline; }
+.cursor-pointer { cursor: pointer; }
+.img-container { height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.card-img-top { max-height: 100%; object-fit: contain; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.shoe-card:hover .card-img-top { transform: scale(1.15) rotate(-5deg); }
+.action-btn { transition: all 0.2s ease; }
+.action-btn:hover { background-color: #ffc107; border-color: #ffc107; color: #000; }
+.action-btn:active { transform: scale(0.95); }
 
-/* Hiệu ứng khi di chuột vào Tên sản phẩm */
-.product-name {
-  transition: color 0.2s;
+/* Đưa CSS Modal ra dùng chung toàn cục hoặc giữ ở đây Teleport vẫn ăn CSS nhé */
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(5px);
+  z-index: 99999; /* Tăng z-index để đè lên cả navbar */
+  display: flex; /* Quan trọng để căn giữa */
 }
-.product-name:hover {
-  color: #ffc107;
-  text-decoration: underline;
+.custom-modal-content {
+  background: white;
+  width: 90%;
+  max-width: 400px;
+  margin: auto; /* Căn giữa hoàn hảo */
 }
-
-.cursor-pointer {
-  cursor: pointer;
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 10px;
 }
-
-.img-container {
-  height: 200px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.card-img-top {
-  max-height: 100%;
-  object-fit: contain;
-  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Ảnh giày xoay nhẹ khi hover trông rất chuyên nghiệp */
-.shoe-card:hover .card-img-top {
-  transform: scale(1.15) rotate(-5deg);
-}
-
-.action-btn {
-  transition: all 0.2s ease;
-}
-
-.action-btn:hover {
-  background-color: #ffc107;
-  border-color: #ffc107;
-  color: #000;
-}
-
-.action-btn:active {
-  transform: scale(0.95);
+.size-btn { height: 40px; border-radius: 10px; }
+.drop-shadow-success { filter: drop-shadow(0 10px 15px rgba(25, 135, 84, 0.4)); }
+.animate-zoom { animation: zoomIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
 }
 </style>

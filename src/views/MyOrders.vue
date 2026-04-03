@@ -10,7 +10,14 @@
       </router-link>
     </div>
 
-    <div v-if="orders.length > 0">
+    <div v-if="loading" class="text-center py-5">
+      <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3 text-muted fw-bold">Đang tải dữ liệu đơn hàng...</p>
+    </div>
+
+    <div v-else-if="orders.length > 0">
       <div
         class="card border-0 shadow-lg rounded-4 mb-5 overflow-hidden order-card border"
         v-for="order in orders"
@@ -103,24 +110,55 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+// 1. IMPORT FIREBASE
+import { auth, db } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
+const router = useRouter();
 const orders = ref([]);
+const loading = ref(true); // Biến kiểm soát trạng thái loading
 
 onMounted(() => {
-  try {
-    const data = localStorage.getItem('orders');
-    if (data) {
-      const parsedData = JSON.parse(data);
-      // Đảm bảo dữ liệu là mảng
-      orders.value = Array.isArray(parsedData) ? parsedData : [];
-      console.log("Đã tải đơn hàng:", orders.value);
+  // Kiểm tra user đang đăng nhập
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      await fetchOrdersFromFirebase(user.uid);
+    } else {
+      // Nếu chưa đăng nhập, đá về trang chủ hoặc trang login
+      loading.value = false;
+      router.push('/login');
     }
-  } catch (err) {
-    console.error("Lỗi đọc Storage:", err);
-  }
+  });
 });
 
-// Hàm màu sắc trạng thái
+// Hàm gọi API lấy dữ liệu từ Firestore
+const fetchOrdersFromFirebase = async (userId) => {
+  try {
+    loading.value = true;
+    // Tìm tất cả đơn hàng trong collection 'orders' có userId trùng với người dùng hiện tại
+    const q = query(collection(db, 'orders'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+
+    const fetchedOrders = [];
+    querySnapshot.forEach((doc) => {
+      // Đẩy dữ liệu vào mảng, lấy luôn id của document trên Firebase
+      fetchedOrders.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Sắp xếp đơn hàng mới nhất lên đầu (dựa vào orderId nếu bạn cấu hình orderId là số/timestamp)
+    fetchedOrders.sort((a, b) => b.orderId - a.orderId);
+
+    orders.value = fetchedOrders;
+  } catch (err) {
+    console.error("Lỗi khi tải đơn hàng từ Firebase:", err);
+  } finally {
+    loading.value = false; // Tắt trạng thái loading dù thành công hay thất bại
+  }
+};
+
+// Hàm hiển thị màu sắc huy hiệu trạng thái
 const statusBadge = (status) => {
   switch (status) {
     case 'Chờ xác nhận': return 'bg-warning text-dark';
@@ -132,18 +170,9 @@ const statusBadge = (status) => {
 </script>
 
 <style scoped>
-.order-card {
-  transition: transform 0.3s ease;
-}
-.order-card:hover {
-  transform: translateY(-5px);
-}
-.product-item:last-child {
-  border-bottom: none !important;
-  margin-bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-.border-dashed {
-  border-style: dashed !important;
-}
+/* CSS giữ nguyên của bạn */
+.order-card { transition: transform 0.3s ease; }
+.order-card:hover { transform: translateY(-5px); }
+.product-item:last-child { border-bottom: none !important; margin-bottom: 0 !important; padding-bottom: 0 !important; }
+.border-dashed { border-style: dashed !important; }
 </style>
