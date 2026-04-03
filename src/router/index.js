@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeDisplay from '../views/HomeDisplay.vue'
-
+import AdminDashboard from '../views/AdminDashboard.vue'
 const routes = [
   { path: '/', name: 'home', component: HomeDisplay },
   { path: '/cart', name: 'cart', component: () => import('../views/UserCart.vue') },
@@ -16,6 +16,11 @@ const routes = [
   { path: '/account', component: () => import('../views/AccountView.vue') },
   { path: '/login', component: () => import('../views/LoginView.vue') },
   { path: '/forgot-password', component: () => import('../views/ForgotPasswordView.vue') },
+  {
+    path: '/admin',
+    name: 'AdminDashboard',
+    component: AdminDashboard,
+  },
 ]
 
 

@@ -13,12 +13,18 @@
     <ul class="nav nav-pills mb-4 gap-2 flex-nowrap overflow-auto hide-scrollbar pb-2">
       <li class="nav-item" v-for="tab in tabs" :key="tab">
         <a
-          class="nav-link cursor-pointer rounded-pill px-4 fw-bold transition-all"
+          class="nav-link cursor-pointer rounded-pill px-4 fw-bold transition-all d-flex align-items-center"
           :class="activeTab === tab ? 'bg-dark text-white shadow' : 'bg-light text-dark hover-gray'"
           @click="activeTab = tab"
         >
           {{ tab }}
-          <span v-if="tab === 'Tất cả'" class="badge bg-warning text-dark ms-1 rounded-pill">{{ orders.length }}</span>
+          <span
+            class="badge ms-2 rounded-pill"
+            :class="activeTab === tab ? 'bg-warning text-dark' : 'bg-secondary text-white'"
+            v-if="getOrderCountByStatus(tab) > 0 || tab === 'Tất cả'"
+          >
+            {{ getOrderCountByStatus(tab) }}
+          </span>
         </a>
       </li>
     </ul>
@@ -144,7 +150,14 @@ const filteredOrders = computed(() => {
   return orders.value.filter(order => (order.status || 'Chờ xác nhận') === activeTab.value);
 });
 
+// HÀM MỚI ĐƯỢC THÊM VÀO ĐỂ TÍNH SỐ LƯỢNG CHO TỪNG TAB
+const getOrderCountByStatus = (status) => {
+  if (status === 'Tất cả') return orders.value.length;
+  return orders.value.filter(order => (order.status || 'Chờ xác nhận') === status).length;
+};
+
 onMounted(() => {
+  // HOÀN TOÀN KHÔNG CÓ CODE PHÂN QUYỀN Ở ĐÂY, CHỈ KIỂM TRA ĐĂNG NHẬP
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       await fetchOrdersFromFirebase(user.uid);
@@ -166,7 +179,6 @@ const fetchOrdersFromFirebase = async (userId) => {
       fetchedOrders.push({ id: doc.id, ...doc.data() });
     });
 
-    // Thuật toán sắp xếp an toàn, đẩy đơn mới lên đầu
     fetchedOrders.sort((a, b) => {
       const numA = Number(a.orderId);
       const numB = Number(b.orderId);

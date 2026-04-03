@@ -1,7 +1,12 @@
 <template>
   <div class="product-detail-wrapper position-relative">
 
-    <div class="container py-5 mt-3" v-if="product">
+    <div v-if="loading" class="container py-5 mt-5 text-center min-vh-100 d-flex flex-column justify-content-center align-items-center">
+      <div class="spinner-border text-warning" style="width: 4rem; height: 4rem;" role="status"></div>
+      <h4 class="mt-4 fw-bold text-muted">Đang tải thông tin sản phẩm...</h4>
+    </div>
+
+    <div class="container py-5 mt-3" v-else-if="product">
       <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
           <li class="breadcrumb-item">
@@ -19,10 +24,10 @@
       <div class="row g-5 mb-5">
         <div class="col-md-6 col-lg-5">
           <div class="product-image-container bg-white p-4 rounded-5 shadow-sm border d-flex align-items-center justify-content-center overflow-hidden position-relative h-100">
-            <img :src="product.image" class="img-fluid main-img" :alt="product.name" />
+            <img :src="product.image" class="img-fluid main-img" :alt="product.name" @error="handleImageError" />
 
             <div class="position-absolute top-0 start-0 m-4 d-flex flex-column gap-2">
-               <span v-if="product.oldPrice" class="badge bg-danger px-3 py-2 fw-bold shadow-sm rounded-pill fs-6">
+               <span v-if="product.oldPrice && product.oldPrice > product.price" class="badge bg-danger px-3 py-2 fw-bold shadow-sm rounded-pill fs-6">
                  🔥 -{{ calculateDiscount(product.price, product.oldPrice) }}%
                </span>
                <span class="badge bg-dark px-3 py-2 fw-bold shadow-sm rounded-pill">MỚI</span>
@@ -55,8 +60,8 @@
           <div class="bg-light p-4 rounded-4 mb-4 border-start border-5 border-warning shadow-sm price-box">
             <div class="d-flex align-items-baseline gap-3">
               <span class="display-4 fw-bold text-danger">${{ product.price }}</span>
-              <span class="fs-4 text-muted text-decoration-line-through" v-if="product.oldPrice">${{ product.oldPrice }}</span>
-              <span class="badge bg-warning text-dark px-2 py-1 ms-auto fw-bold" v-if="product.oldPrice">Tiết kiệm ${{ product.oldPrice - product.price }}</span>
+              <span class="fs-4 text-muted text-decoration-line-through" v-if="product.oldPrice && product.oldPrice > product.price">${{ product.oldPrice }}</span>
+              <span class="badge bg-warning text-dark px-2 py-1 ms-auto fw-bold" v-if="product.oldPrice && product.oldPrice > product.price">Tiết kiệm ${{ product.oldPrice - product.price }}</span>
             </div>
           </div>
 
@@ -148,7 +153,7 @@
         </div>
       </div>
 
-      <div class="border-top pt-5">
+      <div class="border-top pt-5" v-if="relatedProducts.length > 0">
         <h3 class="fw-bold mb-4 text-uppercase border-start border-5 border-warning ps-3">Có Thể Bạn Sẽ Thích</h3>
         <div class="row g-4">
           <div class="col-12 col-sm-6 col-md-4 col-lg-3" v-for="shoe in relatedProducts" :key="shoe.id">
@@ -158,7 +163,7 @@
       </div>
     </div>
 
-    <div v-else class="container py-5 text-center mt-5">
+    <div v-else class="container py-5 text-center min-vh-100 d-flex flex-column justify-content-center align-items-center">
       <h1 class="display-1 text-muted">🔎</h1>
       <h2 class="fw-bold mt-3">Sản phẩm không tồn tại</h2>
       <p class="text-muted">Có vẻ như sản phẩm bạn tìm kiếm đã bị xóa hoặc đường dẫn không đúng.</p>
@@ -168,7 +173,6 @@
     <Teleport to="body">
       <div v-if="showSuccessModal" class="modal-overlay d-flex align-items-center justify-content-center">
         <div class="modal-content-custom p-4 shadow-lg rounded-5 animate-zoom bg-white text-center position-relative">
-
           <button class="btn-close position-absolute top-0 end-0 m-4" @click="showSuccessModal = false"></button>
 
           <div class="mb-3">
@@ -218,20 +222,20 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ShoeCard from '../components/ShoeCard.vue'
 
-// FIREBASE IMPORTS (CRITICAL FOR CART)
+// FIREBASE IMPORTS
 import { auth, db } from '../firebase'
-import { collection, query, where, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, limit } from 'firebase/firestore'
 
 const route = useRoute()
 const router = useRouter()
 
+const loading = ref(true)
 const product = ref(null)
 const relatedProducts = ref([])
 const selectedSize = ref(40)
 const showSuccessModal = ref(false)
 const isProcessing = ref(false)
 
-// Toast logic
 const toast = ref({ show: false, message: '', type: 'error', icon: 'bi-x-circle-fill' })
 let toastTimer = null
 
@@ -244,55 +248,76 @@ const showNotification = (msg, type = 'error') => {
   toastTimer = setTimeout(() => { toast.value.show = false }, 3000)
 }
 
-// MOCK DATA (In a real app, this should come from Firebase too)
-const mockData = [
-  { id: 1, name: "Nike Air Max 270", price: 150, oldPrice: 190, category: "Nam", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600" },
-  { id: 2, name: "Adidas Ultraboost", price: 180, oldPrice: 230, category: "Nam", image: "https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=600" },
-  { id: 3, name: "Jordan 1 Retro High", price: 210, oldPrice: 280, category: "Nam", image: "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?w=800" },
-  { id: 4, name: "Puma RS-X Bold", price: 130, oldPrice: 170, category: "Nữ", image: "https://images.unsplash.com/photo-1584735175315-9d5df23860e6?w=600" },
-  { id: 5, name: "Vans Old Skool", price: 75, oldPrice: 95, category: "Nữ", image: "https://images.unsplash.com/photo-1525966222134-fcfa99b8ae77?w=600" },
-  { id: 6, name: "Converse Chuck 70", price: 95, oldPrice: 110, category: "Nam", image: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=600" },
-  { id: 7, name: "New Balance 574", price: 110, oldPrice: 140, category: "Nữ", image: "https://images.unsplash.com/photo-1539185441755-769473a23570?w=600" },
-  { id: 8, name: "Nike Dunk Low Blue", price: 120, oldPrice: 160, category: "Nam", image: "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=600" },
-  { id: 9, name: "Nike Air Force 1", price: 110, oldPrice: 130, category: "Nam", image: "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?w=600" },
-  { id: 10, name: "Adidas Yeezy 350", price: 320, oldPrice: 400, category: "Nam", image: "https://images.unsplash.com/photo-1586525198428-225f6f12cff5?w=600" },
-  { id: 11, name: "Asics Gel-Kayano", price: 160, oldPrice: 190, category: "Nữ", image: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600" },
-  { id: 12, name: "Reebok Classic", price: 85, oldPrice: 105, category: "Nam", image: "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?w=600" },
-  { id: 13, name: "Balenciaga Triple S", price: 950, oldPrice: 1100, category: "Nữ", image: "https://images.unsplash.com/photo-1512374382149-233c42b6a83b?w=600" },
-  { id: 14, name: "Fila Disruptor II", price: 80, oldPrice: 110, category: "Nữ", image: "https://images.unsplash.com/photo-1515347619252-60a4bd4eff4f?w=600" },
-  { id: 15, name: "Nike Vaporfly Next%", price: 250, oldPrice: 300, category: "Nam", image: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=600" },
-  { id: 16, name: "Adidas Superstar", price: 90, oldPrice: 120, category: "Nữ", image: "https://images.unsplash.com/photo-1589187151032-573a91317445?w=600" }
-]
+const handleImageError = (e) => {
+  e.target.src = "https://via.placeholder.com/600?text=V-STRIDE";
+}
 
-const loadProduct = (id) => {
-  product.value = mockData.find((p) => p.id === id)
-  if (product.value) {
-    relatedProducts.value = mockData
-      .filter((p) => p.category === product.value.category && p.id !== id)
-      .slice(0, 4)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+// 1. LẤY CHI TIẾT SẢN PHẨM TỪ FIREBASE THAY VÌ MOCK DATA
+const loadProduct = async (id) => {
+  if (!id) return;
+  loading.value = true;
+  product.value = null;
+  relatedProducts.value = [];
+
+  try {
+    // Tìm Document theo ID trong bảng products
+    const docRef = doc(db, 'products', id);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      product.value = {
+        id: docSnap.id,
+        ...data,
+        price: Number(data.price),
+        oldPrice: Number(data.oldPrice || 0)
+      };
+
+      // 2. Lấy danh sách sản phẩm liên quan (Cùng category)
+      const q = query(
+        collection(db, 'products'),
+        where('category', '==', data.category),
+        limit(5) // Lấy 5 cái, tí lọc bỏ cái hiện tại ra thì còn 4
+      );
+
+      const relatedSnap = await getDocs(q);
+      const fetchedRelated = [];
+      relatedSnap.forEach((rDoc) => {
+        if(rDoc.id !== docSnap.id) {
+          fetchedRelated.push({ id: rDoc.id, ...rDoc.data(), price: Number(rDoc.data().price) });
+        }
+      });
+
+      relatedProducts.value = fetchedRelated.slice(0, 4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      console.log("Không tìm thấy sản phẩm!");
+    }
+  } catch (error) {
+    console.error("Lỗi khi tải sản phẩm:", error);
+  } finally {
+    loading.value = false;
   }
 }
 
 const calculateDiscount = (price, old) => {
-  if(!old) return 0
+  if(!old || old <= price) return 0
   return Math.round(((old - price) / old) * 100)
 }
 
 onMounted(() => {
-  loadProduct(Number(route.params.id))
+  // Lấy ID từ URL (định dạng String vì Firebase ID là String)
+  loadProduct(route.params.id)
 })
 
 watch(() => route.params.id, (newId) => {
-  if (newId) loadProduct(Number(newId))
+  if (newId) loadProduct(newId)
 })
 
-// --- THE FIX: SAVING TO FIREBASE INSTEAD OF LOCALSTORAGE ---
+// THÊM VÀO GIỎ HÀNG (GIỮ NGUYÊN LOGIC CỦA BẠN ĐÃ LÀM TỐT TRƯỚC ĐÓ)
 const addToCart = async () => {
   const user = auth.currentUser;
-
   if (!user) {
-    // Nếu chưa đăng nhập, chuyển sang trang Login
     showNotification('Vui lòng đăng nhập để thêm vào giỏ hàng!', 'error');
     router.push('/login');
     return;
@@ -301,7 +326,6 @@ const addToCart = async () => {
   isProcessing.value = true;
 
   try {
-    // 1. Kiểm tra xem sản phẩm + size này đã có trong giỏ hàng của user trên Firebase chưa
     const q = query(
       collection(db, 'carts'),
       where('userId', '==', user.uid),
@@ -312,15 +336,10 @@ const addToCart = async () => {
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
-      // 2. Nếu có rồi -> Tăng số lượng (Cập nhật Document cũ)
       const existingDoc = querySnapshot.docs[0];
       const newQuantity = existingDoc.data().quantity + 1;
-
-      await updateDoc(doc(db, 'carts', existingDoc.id), {
-        quantity: newQuantity
-      });
+      await updateDoc(doc(db, 'carts', existingDoc.id), { quantity: newQuantity });
     } else {
-      // 3. Nếu chưa có -> Tạo Document mới trong Collection 'carts'
       await addDoc(collection(db, 'carts'), {
         userId: user.uid,
         id: product.value.id,
@@ -332,12 +351,8 @@ const addToCart = async () => {
       });
     }
 
-    // Báo cho Navbar cập nhật số lượng
     window.dispatchEvent(new Event('cart-updated'));
-
-    // Hiện modal thành công
     showSuccessModal.value = true;
-
   } catch (error) {
     console.error("Lỗi thêm vào giỏ hàng:", error);
     showNotification('Đã xảy ra lỗi khi thêm vào giỏ hàng.', 'error');
@@ -347,28 +362,21 @@ const addToCart = async () => {
 }
 
 const buyNow = async () => {
-  // Đợi hàm addToCart chạy xong (lưu lên Firebase xong) thì mới chuyển trang
   await addToCart();
-
-  // Chỉ chuyển trang nếu giỏ hàng hiện ra thành công (tức là không bị lỗi)
   if (showSuccessModal.value) {
      showSuccessModal.value = false;
      router.push('/cart');
   }
 }
 
-// Hàm này dùng cho danh sách "Có thể bạn sẽ thích" bên dưới
 const onAddToCartCard = async (itemWithSize) => {
    const user = auth.currentUser;
    if (!user) {
      router.push('/login');
      return;
    }
-
    try {
-      // Lấy size từ item truyền lên (nếu không có thì mặc định 40)
       const sizeToBuy = itemWithSize.size || 40;
-
       const q = query(
         collection(db, 'carts'),
         where('userId', '==', user.uid),
@@ -412,14 +420,13 @@ const goCategory = (cat) => {
 </script>
 
 <style scoped>
-/* GENERAL STYLES */
+/* (Phần CSS giữ nguyên hoàn toàn như cũ của bạn, không đổi một dòng nào) */
 .letter-spacing-tight { letter-spacing: -1px; }
 .hover-warning { transition: color 0.2s; }
 .hover-warning:hover { color: #ffc107 !important; }
 .hover-gray:hover { background-color: #f8f9fa !important; }
 .transition-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
-/* PRODUCT IMAGE */
 .product-image-container {
   min-height: 500px;
   background: radial-gradient(circle at center, #ffffff 0%, #f8f9fa 100%);
@@ -435,7 +442,6 @@ const goCategory = (cat) => {
   transform: rotate(0deg) scale(1.1);
 }
 
-/* BUTTONS */
 .icon-btn {
   width: 45px; height: 45px;
   display: flex; align-items: center; justify-content: center;
@@ -447,7 +453,6 @@ const goCategory = (cat) => {
 .hover-lift:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
 .hover-lift:active { transform: translateY(0); }
 
-/* SIZE GRID */
 .size-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
@@ -461,12 +466,10 @@ const goCategory = (cat) => {
 }
 .scale-up { transform: scale(1.05); }
 
-/* PRICE BOX */
 .price-box {
   background: linear-gradient(to right, #f8f9fa, #ffffff);
 }
 
-/* MODAL & TOASTS */
 .modal-overlay {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
   background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(5px);
