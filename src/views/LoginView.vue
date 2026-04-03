@@ -5,7 +5,9 @@
         <div class="card border-0 shadow-lg rounded-4 p-4 animate-fade-in">
           <div class="text-center mb-4">
             <h2 class="fw-bold text-uppercase">Đăng Nhập</h2>
-            <p class="text-muted small">Mừng bạn trở lại với <span class="text-warning fw-bold">SHOE STORE</span></p>
+            <p class="text-muted small">Mừng bạn trở lại với <span class="text-warning fw-bold">V-STRIDE
+</span></p>
+<p>admin/123456</p>
           </div>
 
           <form @submit.prevent="handleLogin">
