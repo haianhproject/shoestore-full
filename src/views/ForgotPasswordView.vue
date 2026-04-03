@@ -44,29 +44,55 @@
 
 <script setup>
 import { ref } from 'vue';
-import { auth } from '../firebase';
+// 1. Nhập thêm db và các hàm Firestore
+import { auth, db } from '../firebase';
 import { sendPasswordResetEmail } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 const email = ref('');
 const loading = ref(false);
 const status = ref({ show: false, title: '', message: '', icon: '', color: '' });
 
 const handleReset = async () => {
+  if (!email.value) return;
   loading.value = true;
+
   try {
-    await sendPasswordResetEmail(auth, email.value);
+    const trimmedEmail = email.value.trim();
+
+    // Bước 1: Kiểm tra xem email này có tồn tại trong kho "users" trên Firestore không
+    const q = query(collection(db, "users"), where("email", "==", trimmedEmail));
+    const querySnapshot = await getDocs(q);
+
+    // Nếu không tìm thấy tài liệu nào khớp -> Email chưa đăng ký
+    if (querySnapshot.empty) {
+      throw new Error("Email này không tồn tại trong hệ thống!");
+    }
+
+    // Bước 2: Nếu email CÓ TỒN TẠI, mới tiến hành gửi mail khôi phục
+    await sendPasswordResetEmail(auth, trimmedEmail);
+
+    // Báo thành công
     status.value = {
       show: true,
       title: 'Thành công!',
-      message: 'Một email khôi phục đã được gửi. Vui lòng kiểm tra hộp thư của bạn.',
+      message: 'Một email khôi phục đã được gửi. Vui lòng kiểm tra hộp thư (và mục Spam) của bạn.',
       icon: 'bi bi-envelope-check-fill',
       color: 'text-success'
     };
-  } catch  {
+
+    email.value = ''; // Xóa rỗng ô input sau khi gửi thành công
+
+  } catch (error) {
+    console.error("Lỗi cấp lại mật khẩu:", error);
+
+    // Báo lỗi ra Modal
     status.value = {
       show: true,
       title: 'Lỗi',
-      message: 'Email này không tồn tại trong hệ thống!',
+      message: error.message === "Email này không tồn tại trong hệ thống!"
+               ? error.message
+               : 'Đã có lỗi mạng xảy ra. Vui lòng thử lại sau!',
       icon: 'bi bi-exclamation-triangle-fill',
       color: 'text-danger'
     };
@@ -77,6 +103,7 @@ const handleReset = async () => {
 </script>
 
 <style scoped>
+/* Giữ nguyên CSS cũ của bạn */
 .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); z-index: 10000; }
 .modal-content-custom { background: white; max-width: 400px; width: 90%; }
 .animate-fade-in { animation: fadeInUp 0.6s ease-out; }
